@@ -227,7 +227,7 @@ main(int argc, char **argv)
       int start_tracking = 50; // set the frame number when we begin tracking the frame
       R2Image *image_frame;
       for (int i = 0; i < num_frames; i++) {
-        char inputname[25], outname[25];;
+        char inputname[40], outname[40];
         sprintf(inputname, "../input/jpg_samples/%07d.jpg", i);
         sprintf(outname, "../output/magic/%07d.jpg", i);
         image_frame = new R2Image(inputname);

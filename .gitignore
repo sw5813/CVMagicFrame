@@ -4,3 +4,8 @@ imgpro
 imgpro.exe 
 R2/libR2.a 
 jpeg/libjpeg.a
+*.exe
+*.idb
+*.pdb
+input/
+*.opendb
