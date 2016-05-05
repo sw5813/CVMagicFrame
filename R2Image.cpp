@@ -247,6 +247,10 @@ svdTest(void)
 ////////////////////// FUNCTIONS FOR MAGIC FRAME ////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
+Point* R2Image::detectFrameCorners(R2Image* previousImage) {
+
+}
+
 void R2Image::mapFramePixels(R2Image * freezeFrame, Point corners[4]) {
   /* 
     1) detect 4 corners in "this" image

@@ -77,6 +77,9 @@ class R2Image {
   void Blur(double sigma);
   void Harris(double sigma);
   void Sharpen(void);
+
+  // Magic Frame operations
+  Point* detectFrameCorners(R2Image* previousImage);
   void mapFramePixels(R2Image * freezeFrame, Point corners[4]);
 
   // further operations
