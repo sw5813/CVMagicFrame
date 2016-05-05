@@ -145,8 +145,8 @@ main(int argc, char **argv)
   // Read input and output image filenames
   if (argc < 3)  ShowUsage();
   argv++, argc--; // First argument is program name
-  char *input_image_name = *argv; argv++, argc--; 
-  char *output_image_name = *argv; argv++, argc--; 
+  char *input_folder_name = *argv; argv++, argc--; 
+  char *output_folder_name = *argv; argv++, argc--; 
 
   // Allocate image
   R2Image *image = new R2Image();
@@ -227,11 +227,10 @@ main(int argc, char **argv)
       int start_tracking = 50; // set the frame number when we begin tracking the frame
       R2Image *image_frame;
       for (int i = 0; i < num_frames; i++) {
-        char inputname[25], outname[25];;
-        sprintf(inputname, "../input/jpg_samples/%07d.jpg", i);
-        sprintf(outname, "../output/magic/%07d.jpg", i);
+        char inputname[100], outname[100];;
+        sprintf(inputname, "%s/%07d.jpg", input_folder_name, i);
+        sprintf(outname, "%s/%07d.jpg", output_folder_name, i);
         image_frame = new R2Image(inputname);
-
 
         if (i == start_tracking) {
           // capture the frame we need to freeze
