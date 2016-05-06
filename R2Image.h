@@ -32,7 +32,6 @@ typedef enum {
 
 struct Point {
   int x,y;
-  double brightness;
 };
 
 // Class definition
@@ -79,8 +78,8 @@ class R2Image {
   void Sharpen(void);
 
   // Magic Frame operations
-  Point* detectFrameCorners(R2Image* previousImage);
-  void mapFramePixels(R2Image * freezeFrame, Point corners[4]);
+  void detectFrameCorners(Point frozenCorners[4]);
+  void mapFramePixels(R2Image * freezeFrame, Point origCorners[4], Point curCorners[4]);
 
   // further operations
   void blendOtherImageTranslated(R2Image * otherImage);
@@ -100,6 +99,8 @@ class R2Image {
   // Utility functions
   void Resize(int width, int height);
   R2Pixel Sample(double u, double v,  int sampling_method);
+  double** DLT(Point fromPoints[4], Point toPoints[4]);
+  bool isWithinFrame(Point pt, Point corners[4]);
 
  private:
   R2Pixel *pixels;

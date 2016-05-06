@@ -8,6 +8,9 @@
 #include "R2Pixel.h"
 #include "R2Image.h"
 #include "svd.h"
+#include <vector>
+#include "math.h"
+#include <cmath>
 
 
 
@@ -247,19 +250,177 @@ svdTest(void)
 ////////////////////// FUNCTIONS FOR MAGIC FRAME ////////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-Point* R2Image::detectFrameCorners(R2Image* previousImage) {
+void R2Image::mapFramePixels(R2Image * freezeFrame, Point origCorners[4], Point curCorners[4]) {
+   
+  //  1) detect 4 corners in "this" image
+  detectFrameCorners(curCorners);
+  //  2) create H homography matrix from the point correspondences of the corners
+  double ** model = DLT(curCorners, origCorners);
+  //  3) map all points within the frozen image to their locations (Hx = x')
+  //      in "this" image and overwrite the pixels with the frozen image pixels
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      Point thisPt;
+      thisPt.x = i; 
+      thisPt.y = j;
+      if (isWithinFrame(thisPt, curCorners)) {  // TODO: implement the "isWithinFrame()" function down below
+        Point estimation;
+        float estx = (model[0][0] * i) + (model[0][1] * j) + model[0][2];
+        float esty = (model[1][0] * i) + (model[1][1] * j) + model[1][2];
+        float estz = (model[2][0] * i) + (model[2][1] * j) + model[2][2];
+        estimation.x = (int) (estx / estz);
+        estimation.y = (int) (esty / estz);
 
+        Pixel(i,j) = freezeFrame->Pixel(estimation.x, estimation.y);
+        Pixel(i,j).Clamp();
+      }
+    }
+  }
+  
 }
 
-void R2Image::mapFramePixels(R2Image * freezeFrame, Point corners[4]) {
-  /* 
-    1) detect 4 corners in "this" image
-    2) create H homography matrix from the point correspondences of the corners
-    3) map all points within the frozen image to their locations (Hx = x')
-        in "this" image and overwrite the pixels with the frozen image pixels
-  */
+
+// Detects the locations of the 4 corners in "this" image, and fills
+//    in the given "corners" array with the point coordinates, so they
+//    can be accessed from the calling function
+void R2Image::detectFrameCorners(Point corners[4]) {
+  std::vector<Point> greenPts;
+
+  // find the MAX total green + blue components of any single pixel in the image
+  float max_GandB = 0.0;
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      float currGB = Pixel(i,j).Green() + Pixel(i,j).Blue();
+      if (currGB > max_GandB) {
+        max_GandB = currGB;
+      }
+    }
+  }
+
+  // find all points that fit into the given constraints (i.e. GREEN enough points)
+  Point currPt;
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      float currGB = Pixel(i,j).Green() + Pixel(i,j).Blue();
+      if (currGB / max_GandB > .3 && Pixel(i,j).Green() > Pixel(i,j).Blue() && Pixel(i,j).Red() < .2) {
+        currPt.x = i;
+        currPt.y = j;
+        greenPts.push_back(currPt);
+      }
+    }
+  }
+
+  Point centroids[4];
+  // initialize centroids for K-means:
+  for (int i = 0; i < 4; i++) {
+    int randPtInd;
+    while (true) {
+      randPtInd = rand() % greenPts.size();
+      bool valid = true;
+      for (int j = 0; j < i; j++) {
+        if (abs(greenPts[randPtInd].x - centroids[j].x) < 100 && abs(greenPts[randPtInd].y - centroids[j].y) < 100) {
+          valid = false;
+        }
+      }
+      if (valid == true) {
+        centroids[i] = greenPts[randPtInd];
+        break;
+      }
+    }
+  }
+
+  // modified k-means 5 iterations -- 
+  // might actually be able to find correct centroids with only 1 iteration if no outlying green points
+  int ptInds[greenPts.size()];
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < greenPts.size(); j++) {
+      int closestCentroid = 0;
+      for (int k = 1; k < 4; k++) {
+        if (sqrt(pow(greenPts[j].x - centroids[k].x,2) + pow(greenPts[j].y - centroids[k].y,2)) < 
+              sqrt(pow(greenPts[j].x - centroids[closestCentroid].x,2) + pow(greenPts[j].y - centroids[closestCentroid].y,2))) {
+          closestCentroid = k;
+        }
+      }
+      ptInds[j] = closestCentroid;
+    }
+
+    for (int k = 0; k < 4; k++) {
+      float numPts = 0;
+      int totX = 0;
+      int totY = 0;
+      for (int j = 0; j < greenPts.size(); j++) {
+        if (ptInds[j] == k) {
+          totX += greenPts[j].x;
+          totY += greenPts[j].y;
+          numPts++;
+        }
+      }
+      centroids[k].x = totX / numPts;
+      centroids[k].y = totY / numPts;
+    }
+  }
+
+  corners[0] = centroids[0];
+  corners[1] = centroids[1];
+  corners[2] = centroids[2];
+  corners[3] = centroids[3];
 }
 
+
+// Computes and returns the model homography matrix given 4 point correspondences
+// If 'fromPoints' and 'toPoints' are from image A and B respectively, the returned
+//    homography matrix 'H' should calculate x' = Hx where x is a point of A and x' is
+//    the corresponding point of B (both points in homogeneous coordinates)
+double** R2Image::DLT(Point fromPoints[4], Point toPoints[4]) {
+  double** Ai = dmatrix(1,8,1,9);
+  int r1,r2;
+  int pt1[3], pt2[3];
+  for (int i = 0; i < 4; i++) {
+    pt1[0] = fromPoints[i].x;
+    pt1[1] = fromPoints[i].y;
+    pt1[2] = 1;
+    pt2[0] = toPoints[i].x;
+    pt2[1] = toPoints[i].y;
+    pt2[2] = 1;
+    r1 = (2*i)+1;
+    r2 = (2*i)+2;
+    for (int j = 1; j<=3; j++) {
+      Ai[r1][j] = 0;
+      Ai[r1][j+3] = (-1)*pt2[2]*pt1[j-1];
+      Ai[r1][j+6] = pt2[1]*pt1[j-1];
+      Ai[r2][j] = pt2[2]*pt1[j-1];
+      Ai[r2][j+3] = 0;
+      Ai[r2][j+6] = (-1)*pt2[0]*pt1[j-1];
+    }
+  }
+
+  // now that the Ai matrix is populated, run svd on it:
+  double singularValues[7]; // 1..6
+  double** nullspaceMatrix = dmatrix(1,9,1,9);
+  svdcmp(Ai, 8, 9, singularValues, nullspaceMatrix);
+  // now find smallest SV and take corresponding eigenvector as H to return
+  int smallestIndex = 1;
+  for(int i = 2; i < 10; i++) {
+    if(singularValues[i] < singularValues[smallestIndex]) {
+      smallestIndex=i;
+    }
+  }
+
+  double** H = new double*[3];
+  H[0] = new double[3];
+  H[1] = new double[3];
+  H[2] = new double[3];
+  for (int i = 0; i < 9; i++) {
+    H[i/3][i%3] = nullspaceMatrix[i+1][smallestIndex];
+  }
+  return H;
+}
+
+bool R2Image::isWithinFrame(Point pt, Point corners[4]) {
+  // implement some sort of check to see whether a point is in the frame regardless of the frame orientation
+  
+  return true;
+}
 
 
 ////////////////////////////////////////////////////////////////////////

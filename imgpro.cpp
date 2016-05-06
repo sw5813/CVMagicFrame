@@ -226,6 +226,8 @@ main(int argc, char **argv)
       argv += 2, argc -= 2;
       int start_tracking = 50; // set the frame number when we begin tracking the frame
       R2Image *image_frame;
+      Point origCorners[4];
+      Point currCorners[4];
       for (int i = 0; i < num_frames; i++) {
         char inputname[100], outname[100];;
         sprintf(inputname, "%s/%07d.jpg", input_folder_name, i);
@@ -235,8 +237,10 @@ main(int argc, char **argv)
         if (i == start_tracking) {
           // capture the frame we need to freeze
           image->Read(inputname);
+          image->detectFrameCorners(origCorners);
         } else if (i > start_tracking) {
           // find frame and replace inside of frame with frozen image (must deal with different angle of frame)
+          image_frame->mapFramePixels(image, origCorners, currCorners);
         }
 
         image_frame->Write(outname);
