@@ -258,25 +258,105 @@ void R2Image::mapFramePixels(R2Image * freezeFrame, Point origCorners[4], Point 
   double ** model = DLT(curCorners, origCorners);
   //  3) map all points within the frozen image to their locations (Hx = x')
   //      in "this" image and overwrite the pixels with the frozen image pixels
-  for (int i = 0; i < width; i++) {
-    for (int j = 0; j < height; j++) {
-      Point thisPt;
-      thisPt.x = i; 
-      thisPt.y = j;
-      if (isWithinFrame(thisPt, curCorners)) {  // TODO: implement the "isWithinFrame()" function down below
-        Point estimation;
-        float estx = (model[0][0] * i) + (model[0][1] * j) + model[0][2];
-        float esty = (model[1][0] * i) + (model[1][1] * j) + model[1][2];
-        float estz = (model[2][0] * i) + (model[2][1] * j) + model[2][2];
-        estimation.x = (int) (estx / estz);
-        estimation.y = (int) (esty / estz);
+  inverseWarp(freezeFrame, curCorners, model);
+}
 
-        Pixel(i,j) = freezeFrame->Pixel(estimation.x, estimation.y);
-        Pixel(i,j).Clamp();
-      }
+void R2Image::inverseWarp(R2Image * freezeFrame, Point curCorners[4], double ** model) {
+	// figure out orientation of rectangle -- use fact that farthest corner from a given corner is the diagonal
+	Point pt1 = curCorners[0];
+	double dist1 = 9999999.9, dist2 = 9999999.9, dist3 = 9999999.9;
+	int ind1, ind2, ind3;
+	for (int j = 1; j < 4; j++) {
+		double dist = sqrt(pow(pt1.x - curCorners[j].x,2) + pow(pt1.y - curCorners[j].y,2));
+		if (dist < dist1) {
+			dist3 = dist2;
+			dist2 = dist1;
+			dist1 = dist;
+			ind3 = ind2;
+			ind2 = ind1;
+			ind1 = j;
+		} else if (dist < dist2) {
+			dist3 = dist2;
+			dist2 = dist;
+			ind3 = ind2;
+			ind2 = j;
+		} else {
+			dist3 = dist;
+			ind3 = j;
+		}
+	}
+	// now create corners array that has the corners in order of going around the rectangle
+	Point corners[4];
+	corners[0] = pt1;
+	corners[1] = curCorners[ind1];
+	corners[2] = curCorners[ind3];
+	corners[3] = curCorners[ind2];
+
+	// create equations for borders of rectangle
+	double m12 = 0.0,m23 = 0.0,m34 = 0.0,m41 = 0.0,b12 = 0.0,b23 = 0.0,b34 = 0.0,b41 = 0.0;
+	if (corners[1].x == corners[0].x) {
+		corners[1].x = corners[1].x + 1;
+	}
+	m12 = ((double)corners[1].y - corners[0].y) / ((double)corners[1].x - corners[0].x);
+	b12 = corners[1].y - (m12 * corners[1].x);
+	if (corners[2].x == corners[1].x) {
+		corners[2].x = corners[2].x + 1;
+	}
+	m23 = ((double)corners[2].y - corners[1].y) / ((double)corners[2].x - corners[1].x);
+	b23 = corners[2].y - (m23 * corners[2].x);
+	if (corners[3].x == corners[2].x) {
+		corners[3].x = corners[3].x + 1;
+	}
+	m34 = ((double)corners[3].y - corners[2].y) / ((double)corners[3].x - corners[2].x);
+	b34 = corners[3].y - (m34 * corners[3].x);
+	if (corners[4].x == corners[1].x) {
+		corners[4].x = corners[4].x + 1;
+	}
+	m41 = ((double)corners[0].y - corners[3].y) / ((double)corners[0].x - corners[3].x);
+	b41 = corners[0].y - (m41 * corners[0].x);
+
+	// "above" variables are true if we want points above corresponding line
+	bool above12 = false, above23 = false, above34 = false, above41 = false;
+	if (corners[2].y >= (m12 * corners[2].x) + b12) {
+		above12 = true;
+	}
+	if (corners[0].y >= (m23 * corners[0].x) + b23) {
+		above23 = true;
+	}
+	if (corners[0].y >= (m34 * corners[0].x) + b34) {
+		above34 = true;
+	}
+	if (corners[2].y >= (m41 * corners[2].x) + b41) {
+		above41 = true;
+	}
+
+	for (int i = 0; i < width; i++) {
+    	for (int j = 0; j < height; j++) {
+    		if (((above12 && (j >= (m12 * i) + b12)) || (!above12 && (j <= (m12 * i) + b12))) &&
+		        ((above23 && (j >= (m23 * i) + b23)) || (!above23 && (j <= (m23 * i) + b23))) &&
+		        ((above34 && (j >= (m34 * i) + b34)) || (!above34 && (j <= (m34 * i) + b34))) &&
+		        ((above41 && (j >= (m41 * i) + b41)) || (!above41 && (j <= (m41 * i) + b41)))) {
+
+    			// these are the pixels to warp -- Hx = x'
+	 			Point estimation;
+		        float estx = (model[0][0] * i) + (model[0][1] * j) + model[0][2];
+		        float esty = (model[1][0] * i) + (model[1][1] * j) + model[1][2];
+		        float estz = (model[2][0] * i) + (model[2][1] * j) + model[2][2];
+		        estimation.x = (int) (estx / estz);
+		        estimation.y = (int) (esty / estz);
+
+		        //// testing homography model ////
+		        if (estimation.x < 0 || estimation.y < 0 || estimation.x > width || estimation.y > height) {
+		        	fprintf(stderr,"Oops, (%d , %d) not on the image\n",estimation.x,estimation.y);
+		        }
+
+		        Pixel(i,j) = freezeFrame->Pixel(estimation.x, estimation.y);
+		        // replace above to fill in frame with black:
+		        // Pixel(i,j).SetRed(0.0); Pixel(i,j).SetGreen(0.0); Pixel(i,j).SetBlue(0.0); 
+		        Pixel(i,j).Clamp();
+    		}
+    	}
     }
-  }
-  
 }
 
 
@@ -415,13 +495,6 @@ double** R2Image::DLT(Point fromPoints[4], Point toPoints[4]) {
   }
   return H;
 }
-
-bool R2Image::isWithinFrame(Point pt, Point corners[4]) {
-  // implement some sort of check to see whether a point is in the frame regardless of the frame orientation
-  
-  return true;
-}
-
 
 ////////////////////////////////////////////////////////////////////////
 // Image processing functions

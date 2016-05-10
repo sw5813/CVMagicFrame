@@ -100,7 +100,7 @@ class R2Image {
   void Resize(int width, int height);
   R2Pixel Sample(double u, double v,  int sampling_method);
   double** DLT(Point fromPoints[4], Point toPoints[4]);
-  bool isWithinFrame(Point pt, Point corners[4]);
+  void inverseWarp(R2Image * freezeFrame, Point corners[4], double ** homographyModel);
 
  private:
   R2Pixel *pixels;

@@ -224,7 +224,7 @@ main(int argc, char **argv)
       CheckOption(*argv, argc, 2);
       int num_frames = atof(argv[1]);
       argv += 2, argc -= 2;
-      int start_tracking = 50; // set the frame number when we begin tracking the frame
+      int start_tracking = 0; // set the frame number when we begin tracking the frame
       R2Image *image_frame;
       Point origCorners[4];
       Point currCorners[4];
@@ -242,7 +242,7 @@ main(int argc, char **argv)
           // find frame and replace inside of frame with frozen image (must deal with different angle of frame)
           image_frame->mapFramePixels(image, origCorners, currCorners);
         }
-
+        fprintf(stderr,"Made it through, %d",i);
         image_frame->Write(outname);
         delete image_frame;
       }
