@@ -79,6 +79,7 @@ class R2Image {
 
   // Magic Frame operations
   void detectFrameCorners(Point frozenCorners[4]);
+  void detectLocalCorners(Point frozenCorners[4]);
   void mapFramePixels(R2Image * freezeFrame, Point origCorners[4], Point curCorners[4]);
 
   // further operations

@@ -230,14 +230,18 @@ main(int argc, char **argv)
       Point currCorners[4];
       for (int i = 0; i < num_frames; i++) {
         char inputname[100], outname[100];;
-        sprintf(inputname, "%s/%07d.jpg", input_folder_name, i);
-        sprintf(outname, "%s/%07d.jpg", output_folder_name, i);
+        sprintf(inputname, "%s/%07d.jpg", input_folder_name, i+1);
+        sprintf(outname, "%s/%07d.jpg", output_folder_name, i+1);
         image_frame = new R2Image(inputname);
 
         if (i == start_tracking) {
           // capture the frame we need to freeze
           image->Read(inputname);
           image->detectFrameCorners(origCorners);
+
+          for (int j = 0; j < 4; j++) {
+            currCorners[j] = origCorners[j];
+          }
         } else if (i > start_tracking) {
           // find frame and replace inside of frame with frozen image (must deal with different angle of frame)
           image_frame->mapFramePixels(image, origCorners, currCorners);
