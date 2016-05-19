@@ -45,7 +45,8 @@ static char options[] =
 "  -sharpen \n"
 "  -matchTranslation <file:other_image>\n"
 "  -matchHomography <file:other_image>\n"
-"  -processVid <int:num_frames>\n";
+"  -processVid <int:num_frames>\n"
+"  -multipleFreezes <int:num_frames>\n";
 
 
 static void 
@@ -247,6 +248,77 @@ main(int argc, char **argv)
           image_frame->mapFramePixels(image, origCorners, currCorners);
         }
         fprintf(stderr,"Made it through, %d",i);
+        image_frame->Write(outname);
+        delete image_frame;
+      }
+    }
+    else if (!strcmp(*argv, "-multipleFreezes")) {
+      CheckOption(*argv, argc, 2);
+      int num_frames = atof(argv[1]);
+
+      /*int start1 = 45;
+      int end1 = 116;
+      int start2 = 174;
+      int end2 = 235;
+      int start3 = 285;*/
+
+      int start1 = 54;
+      int end1 = 145;
+      int start2 = 190;
+      int end2 = 260;
+      int start3 = 302;
+
+      R2Image *image2 = new R2Image();
+      R2Image *image3 = new R2Image();
+
+      argv += 3, argc -= 3;
+      R2Image *image_frame;
+      Point origCorners[4];
+      Point currCorners[4];
+
+      for (int i = 0; i < num_frames; i++) {
+        char inputname[100], outname[100];;
+        sprintf(inputname, "%s/%07d.jpg", input_folder_name, i+1);
+        sprintf(outname, "%s/%07d.jpg", output_folder_name, i+1);
+        image_frame = new R2Image(inputname);
+
+        if (i == start1) {
+          // capture the frame we need to freeze
+          image->Read(inputname);
+          image->detectFrameCorners(origCorners);
+
+
+          for (int j = 0; j < 4; j++) {
+            currCorners[j] = origCorners[j];
+          }
+        } else if (i == start2 || i == start3) {
+          if (i == start2) {
+            image2->Read(inputname);
+            image2->detectFrameCorners(origCorners);
+          } else {
+            image3->Read(inputname);
+            image3->detectFrameCorners(origCorners);
+          }
+          for (int j = 0; j < 4; j++) {
+            currCorners[j] = origCorners[j];
+          }
+        } else if ((i < start1) || (i >= end1 && i < start2)|| (i >= end2 && i < start3)) {
+          // do nothing
+        } else if (i > start1 && i <= end1) {
+          fprintf(stderr,"replacing frame1 on image %d   ",i);
+          // find frame and replace inside of frame with frozen image (must deal with different angle of frame)
+          image_frame->mapFramePixels(image, origCorners, currCorners);
+          //return 1;
+        } else if (i > start2 && i <= end2) {
+          fprintf(stderr,"replacing frame2 on image %d   ",i);
+          image_frame->mapFramePixels(image2, origCorners, currCorners);
+        } else if (i > start3) {
+          fprintf(stderr,"replacing frame3 on image %d   ",i);
+          image_frame->mapFramePixels(image3, origCorners, currCorners);
+        }
+        //if (i%10 == 0) {
+          fprintf(stderr,"Made it through %d\n",i);
+        //}
         image_frame->Write(outname);
         delete image_frame;
       }
